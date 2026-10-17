@@ -54,6 +54,7 @@ body {
 
 a { color: var(--accent); }
 h1 { font-size: 1.25rem; margin: 0 0 4px; line-height: 1.3; }
+h2 { font-size: 1.1rem; margin: 0; line-height: 1.3; }
 h3 { font-size: 1rem; margin: 0 0 8px; }
 code { font-size: 0.85em; }
 .muted { color: var(--text-muted); }
@@ -68,6 +69,17 @@ code { font-size: 0.85em; }
 .map-wrap { position: relative; min-height: 0; }
 .map { position: absolute; inset: 0; }
 .map-loading { display: grid; place-items: center; color: var(--text-muted); }
+.map-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+}
 
 .legend {
   position: absolute;
@@ -96,6 +108,34 @@ code { font-size: 0.85em; }
 }
 .panel header p { margin: 0; }
 .panel footer { margin-top: auto; }
+.panel footer p { margin: 0 0 6px; }
+
+.controls { display: flex; flex-direction: column; gap: 12px; }
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+.segmented button {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
 
 label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-muted); }
 select, input {
@@ -155,7 +195,8 @@ select, input {
 .inverse { margin-top: 4px; }
 .hint { margin: 6px 0 0; font-size: 0.85rem; }
 
-.maplibregl-popup-content { font-size: 0.8rem; padding: 4px 8px; }
+/* MapLibre popups are always white; keep their text dark in dark mode too. */
+.maplibregl-popup-content { font-size: 0.8rem; padding: 4px 8px; color: #1f1e1c; }
 
 
 @media (max-width: 760px) {

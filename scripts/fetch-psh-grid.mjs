@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Download long-term (climatology) solar irradiation for Indonesia from the
-// NASA POWER regional API and write a compact grid to public/data/psh-grid.json.
+// NASA POWER regional API and write a compact grid to data/psh-grid.json.
 //
 // ALLSKY_SFC_SW_DWN is in kWh/m²/day, which equals Peak Sun Hours directly.
 // The regional endpoint accepts boxes of at most 10° x 10°, so Indonesia is
@@ -12,7 +12,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const OUT = join(dirname(fileURLToPath(import.meta.url)), "../public/data/psh-grid.json");
+const OUT = join(dirname(fileURLToPath(import.meta.url)), "../data/psh-grid.json");
 const API = "https://power.larc.nasa.gov/api/temporal/climatology/regional";
 const PARAM = "ALLSKY_SFC_SW_DWN";
 const KEYS = ["ANN", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];

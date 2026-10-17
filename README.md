@@ -5,6 +5,9 @@ Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya
 - **Data:** [NASA POWER](https://power.larc.nasa.gov), parameter `ALLSKY_SFC_SW_DWN`
   (radiasi matahari harian di permukaan, kWh/m²/hari). Karena PSH = kWh/m²/hari ÷ 1 kW/m²,
   angkanya langsung sama dengan jam PSH. Dipakai rata-rata jangka panjang (climatology).
+- **Batas wilayah:** batas administrasi BPS (34 provinsi, 522 kabupaten/kota, 7.069 kecamatan)
+  dari [OCHA HDX COD-AB](https://data.humdata.org/dataset/cod-ab-idn), diambil lewat salinan
+  [geoBoundaries](https://www.geoboundaries.org) "gbHumanitarian". Lisensi CC BY 3.0 IGO.
 - **Peta:** [MapLibre GL JS](https://maplibre.org) + basemap [OpenFreeMap](https://openfreemap.org)
   (data © OpenStreetMap). Semuanya open source dan tanpa API key.
 - **Web:** React + Vite (TypeScript), di-deploy ke **Cloudflare Workers** (static assets).
@@ -15,21 +18,36 @@ Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya
 
 ## Fitur
 
-- Layer grid PSH se-Indonesia, bisa pilih rata-rata tahunan atau per bulan
-- Klik titik mana saja → PSH bulanan langsung dari API NASA POWER (kalau API gagal, pakai sel grid terdekat)
+- Peta PSH per **kabupaten/kota** atau per **kecamatan** (hanya daratan), bisa pilih rata-rata tahunan atau per bulan
+- Klik wilayah → nama, induk wilayah, PSH, dan grafik 12 bulan
 - Kalkulator PLTS: produksi = PSH × kWp × performance ratio, plus estimasi kWp untuk kebutuhan kWh/bulan
 
 ## Menjalankan secara lokal
 
 ```bash
 npm install
-npm run data:fetch   # unduh grid NASA POWER -> public/data/psh-grid.json (sekali saja)
 npm run dev          # http://localhost:5173
 ```
 
-`data:fetch` mengambil data per kotak 10°×10° (batas API regional NASA POWER) lalu
-menyimpan grid ringkas. **Commit file `public/data/psh-grid.json`** supaya build di
-Cloudflare tidak perlu memanggil API NASA lagi.
+Data wilayah sudah ada di repo (`public/data/*.topo.json`), jadi langsung bisa dijalankan.
+
+### Memperbarui data
+
+```bash
+npm run data:fetch     # grid NASA POWER -> data/psh-grid.json
+npm run data:regions   # batas wilayah + rata-rata PSH -> public/data/kabupaten.topo.json, kecamatan.topo.json
+```
+
+- `data:fetch` mengambil data per kotak 10°×10° (batas API regional NASA POWER).
+- `data:regions` mengunduh batas wilayah (disimpan di `.cache/`), menyederhanakan bentuknya,
+  lalu menghitung PSH tiap wilayah sebagai rata-rata grid yang diinterpolasi bilinear di titik-titik
+  sampel di dalam poligon. Induk wilayah (kecamatan → kabupaten → provinsi) dicocokkan secara spasial.
+  Hasilnya TopoJSON (kecamatan ±4,7 MB, ±1,4 MB terkompresi).
+
+Commit hasilnya supaya build di Cloudflare tidak perlu mengunduh apa pun.
+
+> **Batas resolusi:** grid NASA POWER berukuran 1° (±110 km). Nilai kecamatan yang berdekatan
+> karena itu sering mirip; perbedaan detail antar-kecamatan butuh sumber data beresolusi lebih tinggi.
 
 ## Deploy ke Cloudflare
 
@@ -63,14 +81,17 @@ src/components/PshExplorer    state utama: periode, titik terpilih, panel
 src/components/PshMap         peta MapLibre + layer grid
 src/components/MonthlyChart   grafik PSH bulanan
 src/components/Calculator     kalkulator PLTS
-src/lib/psh.ts                tipe data, skala warna, akses NASA POWER
+src/lib/psh.ts                tipe data wilayah, skala warna, pemuat TopoJSON
 scripts/fetch-psh-grid.mjs    pengunduh grid NASA POWER
+scripts/build-regions.mjs     batas wilayah + agregasi PSH per kabupaten/kecamatan
+data/psh-grid.json            grid NASA POWER (input build)
+public/data/*.topo.json       data wilayah yang dimuat aplikasi
 wrangler.jsonc                konfigurasi Cloudflare
 ```
 
 ## Rencana berikutnya
 
-- Masking laut (sekarang grid juga menutupi lautan)
-- Rata-rata PSH per provinsi/kabupaten pakai batas wilayah [geoBoundaries](https://www.geoboundaries.org) (ADM1/ADM2)
-- Pencarian lokasi (geocoding Nominatim/OSM)
+- Data radiasi beresolusi lebih tinggi supaya beda antar-kecamatan lebih nyata
+  (mis. [Global Solar Atlas](https://globalsolaratlas.info), CC BY 4.0, ±250 m)
+- Pencarian nama kecamatan/kabupaten
 - Validasi dengan data lama penyinaran stasiun BMKG
