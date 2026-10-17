@@ -39,15 +39,16 @@ export type PshGrid = {
 };
 
 // Single-hue sequential ramp (light -> dark orange): low PSH recedes toward
-// the basemap, high PSH reads as the strongest colour.
+// the basemap, high PSH reads as the strongest colour. Stops span the bulk of
+// NASA POWER monthly values over Indonesia (~3.5-7 h/day; annual ~4.4-6.2).
 export const PSH_RAMP: [number, string][] = [
-  [3.0, "#fdebdc"],
-  [3.5, "#fbcfae"],
-  [4.0, "#f7ad7f"],
-  [4.5, "#f08a53"],
-  [5.0, "#e2662d"],
-  [5.5, "#b84b1a"],
-  [6.0, "#843311"],
+  [3.5, "#fdebdc"],
+  [4.0, "#fbcfae"],
+  [4.5, "#f7ad7f"],
+  [5.0, "#f08a53"],
+  [5.5, "#e2662d"],
+  [6.0, "#b84b1a"],
+  [6.5, "#843311"],
 ];
 
 export function pshColor(value: number): string {
