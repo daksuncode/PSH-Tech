@@ -1,0 +1,29 @@
+{
+  "name": "psh-tech",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "data:fetch": "node scripts/fetch-psh-grid.mjs",
+    "preview": "next build && wrangler dev",
+    "deploy": "next build && wrangler deploy"
+  },
+  "dependencies": {
+    "maplibre-gl": "^5.24.0",
+    "next": "^16.4.2",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.151.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
