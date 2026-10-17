@@ -157,7 +157,6 @@ select, input {
 
 .maplibregl-popup-content { font-size: 0.8rem; padding: 4px 8px; }
 
-.not-found { padding: 48px 16px; text-align: center; }
 
 @media (max-width: 760px) {
   .layout { grid-template-columns: 1fr; grid-template-rows: 55dvh auto; height: auto; }

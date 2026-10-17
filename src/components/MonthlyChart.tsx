@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { MONTHS, type Climatology, type Period } from "@/lib/psh";
+import { MONTHS, type Climatology, type Period } from "../lib/psh";
 
 const W = 320;
 const H = 160;

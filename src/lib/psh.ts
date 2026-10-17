@@ -4,6 +4,8 @@
 // the 1 kW/m² standard test irradiance, so the number is the same; only the
 // unit changes to "hours/day".
 
+import type { FeatureCollection } from "geojson";
+
 export const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
   "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
@@ -113,7 +115,7 @@ export function nearestCell(
 }
 
 /** Grid -> GeoJSON squares; properties p0 (annual) .. p12 (Dec). */
-export function gridToGeoJSON(grid: PshGrid): GeoJSON.FeatureCollection {
+export function gridToGeoJSON(grid: PshGrid): FeatureCollection {
   const h = grid.resolution / 2;
   return {
     type: "FeatureCollection",
