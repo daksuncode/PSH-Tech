@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { DAYS_IN_MONTH, type Climatology } from "@/lib/psh";
+import { DAYS_IN_MONTH, type Climatology } from "../lib/psh";
 
 const fmt = (v: number, digits = 0) =>
   v.toLocaleString("id-ID", { maximumFractionDigits: digits, minimumFractionDigits: digits });

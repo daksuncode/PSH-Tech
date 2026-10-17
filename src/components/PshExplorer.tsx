@@ -1,19 +1,13 @@
-"use client";
-
-import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
-import Calculator from "@/components/Calculator";
-import MonthlyChart from "@/components/MonthlyChart";
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react";
+import Calculator from "./Calculator";
+import MonthlyChart from "./MonthlyChart";
 import {
   MONTHS, PSH_RAMP, fetchPointClimatology, nearestCell, periodLabel, periodValue,
   type Climatology, type Period, type PshGrid,
-} from "@/lib/psh";
+} from "../lib/psh";
 
-// MapLibre needs `window`, so the map is only rendered in the browser.
-const PshMap = dynamic(() => import("@/components/PshMap"), {
-  ssr: false,
-  loading: () => <div className="map map-loading">Memuat peta…</div>,
-});
+// MapLibre is the heaviest dependency; load it in its own chunk.
+const PshMap = lazy(() => import("./PshMap"));
 
 type PointState =
   | { status: "idle" }
@@ -30,7 +24,7 @@ export default function PshExplorer() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    fetch("/data/psh-grid.json")
+    fetch(`${import.meta.env.BASE_URL}data/psh-grid.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then(setGrid)
       .catch(() => setGridMissing(true));
@@ -62,7 +56,9 @@ export default function PshExplorer() {
   return (
     <div className="layout">
       <div className="map-wrap">
-        <PshMap grid={grid} period={period} selected={selected} onSelect={onSelect} />
+        <Suspense fallback={<div className="map map-loading">Memuat peta…</div>}>
+          <PshMap grid={grid} period={period} selected={selected} onSelect={onSelect} />
+        </Suspense>
         <div className="legend" aria-label="Legenda PSH">
           <span className="legend-title">PSH (jam/hari) · {periodLabel(period)}</span>
           <div className="legend-ramp">

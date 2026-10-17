@@ -1,8 +1,6 @@
-"use client";
-
 import { useEffect, useRef } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MlMap } from "maplibre-gl";
-import { PSH_RAMP, gridToGeoJSON, type Period, type PshGrid } from "@/lib/psh";
+import { PSH_RAMP, gridToGeoJSON, type Period, type PshGrid } from "../lib/psh";
 
 // Free, keyless vector basemap built on OpenStreetMap data.
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";

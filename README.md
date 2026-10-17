@@ -7,7 +7,7 @@ Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya
   angkanya langsung sama dengan jam PSH. Dipakai rata-rata jangka panjang (climatology).
 - **Peta:** [MapLibre GL JS](https://maplibre.org) + basemap [OpenFreeMap](https://openfreemap.org)
   (data © OpenStreetMap). Semuanya open source dan tanpa API key.
-- **Web:** Next.js (static export), di-deploy ke **Cloudflare Workers** (static assets).
+- **Web:** React + Vite (TypeScript), di-deploy ke **Cloudflare Workers** (static assets).
 
 > Kenapa bukan BMKG? API publik BMKG (`api.bmkg.go.id`) cuma menyediakan prakiraan cuaca
 > 3 hari, tanpa data radiasi. Data lama penyinaran BMKG (dataonline.bmkg.go.id) cocok untuk
@@ -24,7 +24,7 @@ Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya
 ```bash
 npm install
 npm run data:fetch   # unduh grid NASA POWER -> public/data/psh-grid.json (sekali saja)
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:5173
 ```
 
 `data:fetch` mengambil data per kotak 10°×10° (batas API regional NASA POWER) lalu
@@ -33,8 +33,8 @@ Cloudflare tidak perlu memanggil API NASA lagi.
 
 ## Deploy ke Cloudflare
 
-`next build` menghasilkan situs statis di `out/`, lalu `wrangler.jsonc` menyajikan folder itu
-sebagai static assets Worker. Tidak ada kode server.
+`vite build` menghasilkan situs statis di `dist/`, lalu `wrangler.jsonc` menyajikan folder itu
+sebagai static assets Worker (mode single-page application). Tidak ada kode server.
 
 ### Opsi A: hubungkan repo GitHub (disarankan)
 
@@ -49,22 +49,23 @@ sebagai static assets Worker. Tidak ada kode server.
 
 ```bash
 npx wrangler login
-npm run deploy       # next build && wrangler deploy
+npm run deploy       # vite build && wrangler deploy
 ```
 
-`npm run preview` menjalankan hasil build secara lokal dengan runtime Cloudflare (`wrangler dev`).
+`npm run preview` menyajikan hasil build secara lokal; `npm run cf:preview` menjalankannya dengan runtime Cloudflare (`wrangler dev`).
 
 ## Struktur
 
 ```
-app/                     halaman Next.js (App Router)
-components/PshExplorer   state utama: periode, titik terpilih, panel
-components/PshMap        peta MapLibre + layer grid
-components/MonthlyChart  grafik PSH bulanan
-components/Calculator    kalkulator PLTS
-lib/psh.ts               tipe data, skala warna, akses NASA POWER
-scripts/fetch-psh-grid.mjs  pengunduh grid NASA POWER
-wrangler.jsonc           konfigurasi Cloudflare
+index.html                    entry HTML Vite
+src/main.tsx                  bootstrap React
+src/components/PshExplorer    state utama: periode, titik terpilih, panel
+src/components/PshMap         peta MapLibre + layer grid
+src/components/MonthlyChart   grafik PSH bulanan
+src/components/Calculator     kalkulator PLTS
+src/lib/psh.ts                tipe data, skala warna, akses NASA POWER
+scripts/fetch-psh-grid.mjs    pengunduh grid NASA POWER
+wrangler.jsonc                konfigurasi Cloudflare
 ```
 
 ## Rencana berikutnya
