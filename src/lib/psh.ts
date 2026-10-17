@@ -4,16 +4,13 @@
 // the 1 kW/m² standard test irradiance, so the number is the same; only the
 // unit changes to "hours/day".
 
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import type { Topology } from "topojson-specification";
+import { feature } from "topojson-client";
 
 export const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
   "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
-] as const;
-
-const POWER_KEYS = [
-  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
 ] as const;
 
 export const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -27,16 +24,54 @@ export type Climatology = {
   monthly: number[];
 };
 
-/** Compact grid written by scripts/fetch-psh-grid.mjs. */
-export type PshGrid = {
-  source: string;
-  parameter: string;
-  unit: string;
-  resolution: number;
-  generatedAt: string;
-  /** Each row: [lon, lat, annual, jan, ..., dec] (cell centre). */
-  points: number[][];
+/** Administrative level shown on the map. */
+export type Level = "kabupaten" | "kecamatan";
+
+export const LEVEL_LABEL: Record<Level, string> = {
+  kabupaten: "Kabupaten/Kota",
+  kecamatan: "Kecamatan",
 };
+
+/**
+ * Region properties written by scripts/build-regions.mjs: name, parent names,
+ * and PSH as p0 (annual) .. p12 (Dec).
+ */
+export type RegionProps = {
+  id: number;
+  n: string;
+  kb?: string;
+  pr: string;
+} & Record<`p${number}`, number>;
+
+export type Regions = FeatureCollection<Polygon | MultiPolygon, RegionProps>;
+
+export function regionClimatology(r: RegionProps): Climatology {
+  return {
+    annual: r.p0,
+    monthly: Array.from({ length: 12 }, (_, i) => r[`p${i + 1}`]),
+  };
+}
+
+// Source names mark cities with a "Kota " prefix; everything else is a kabupaten.
+const regencyLabel = (name: string) => (name.startsWith("Kota ") ? name : `Kab. ${name}`);
+
+/** Display name; kabupaten get "Kab." so "Bandung" isn't confused with "Kota Bandung". */
+export function regionName(r: RegionProps): string {
+  return r.kb === undefined ? regencyLabel(r.n) : r.n;
+}
+
+/** Parent names, e.g. "Kota Bandung, Jawa Barat". */
+export function regionParents(r: RegionProps): string {
+  return r.kb ? `${regencyLabel(r.kb)}, ${r.pr}` : r.pr;
+}
+
+/** Load a level's TopoJSON from public/data and convert it to GeoJSON. */
+export async function loadRegions(level: Level): Promise<Regions> {
+  const res = await fetch(`${import.meta.env.BASE_URL}data/${level}.topo.json`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const topo = (await res.json()) as Topology;
+  return feature(topo, topo.objects.regions) as unknown as Regions;
+}
 
 // Single-hue sequential ramp (light -> dark orange): low PSH recedes toward
 // the basemap, high PSH reads as the strongest colour. Stops span the bulk of
@@ -51,92 +86,10 @@ export const PSH_RAMP: [number, string][] = [
   [6.5, "#843311"],
 ];
 
-export function pshColor(value: number): string {
-  let color = PSH_RAMP[0][1];
-  for (const [stop, hex] of PSH_RAMP) {
-    if (value >= stop) color = hex;
-  }
-  return color;
-}
-
 export function periodLabel(period: Period): string {
   return period === 0 ? "Rata-rata tahunan" : MONTHS[period - 1];
 }
 
 export function periodValue(c: Climatology, period: Period): number {
   return period === 0 ? c.annual : c.monthly[period - 1];
-}
-
-const POWER_POINT_URL =
-  "https://power.larc.nasa.gov/api/temporal/climatology/point";
-
-/** Long-term monthly PSH for a point, straight from the NASA POWER API. */
-export async function fetchPointClimatology(
-  lat: number,
-  lon: number,
-  signal?: AbortSignal,
-): Promise<Climatology> {
-  const params = new URLSearchParams({
-    parameters: "ALLSKY_SFC_SW_DWN",
-    community: "RE",
-    latitude: lat.toFixed(4),
-    longitude: lon.toFixed(4),
-    format: "JSON",
-  });
-  const res = await fetch(`${POWER_POINT_URL}?${params}`, { signal });
-  if (!res.ok) throw new Error(`NASA POWER membalas HTTP ${res.status}`);
-  const body = await res.json();
-  const values = body?.properties?.parameter?.ALLSKY_SFC_SW_DWN;
-  if (!values) throw new Error("Format respons NASA POWER tidak dikenali");
-  const monthly = POWER_KEYS.map((k) => Number(values[k]));
-  const annual = Number(values.ANN);
-  if ([annual, ...monthly].some((v) => !Number.isFinite(v) || v < 0)) {
-    throw new Error("Data tidak tersedia untuk titik ini");
-  }
-  return { annual, monthly };
-}
-
-/** Nearest grid cell, or null when the point lies outside the grid. */
-export function nearestCell(
-  grid: PshGrid,
-  lat: number,
-  lon: number,
-): Climatology | null {
-  let best: number[] | null = null;
-  let bestDist = Infinity;
-  for (const p of grid.points) {
-    const d = (p[0] - lon) ** 2 + (p[1] - lat) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = p;
-    }
-  }
-  if (!best || Math.sqrt(bestDist) > grid.resolution) return null;
-  return { annual: best[2], monthly: best.slice(3, 15) };
-}
-
-/** Grid -> GeoJSON squares; properties p0 (annual) .. p12 (Dec). */
-export function gridToGeoJSON(grid: PshGrid): FeatureCollection {
-  const h = grid.resolution / 2;
-  return {
-    type: "FeatureCollection",
-    features: grid.points.map(([lon, lat, ...values]) => {
-      const properties: Record<string, number> = {};
-      values.forEach((v, i) => (properties[`p${i}`] = v));
-      return {
-        type: "Feature",
-        properties,
-        geometry: {
-          type: "Polygon",
-          coordinates: [[
-            [lon - h, lat - h],
-            [lon + h, lat - h],
-            [lon + h, lat + h],
-            [lon - h, lat + h],
-            [lon - h, lat - h],
-          ]],
-        },
-      };
-    }),
-  };
 }

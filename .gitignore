@@ -21,3 +21,6 @@ yarn-error.log*
 # cloudflare / wrangler
 .wrangler/
 .dev.vars
+
+# downloaded source data
+/.cache/
