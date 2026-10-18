@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { type GeoJSONSource, type Map as MlMap } from "maplibre-gl";
-import { PSH_RAMP, regionName, type Period, type RegionProps, type Regions } from "../lib/psh";
+import {
+  NO_DATA_COLOR, formatSigned, rampFor, regionName, regionValue,
+  type Period, type RegionProps, type Regions, type Source,
+} from "../lib/psh";
 
 // Free, keyless vector basemap built on OpenStreetMap data.
 const BASEMAP = "https://tiles.openfreemap.org/styles/positron";
@@ -9,29 +12,48 @@ const SOURCE = "regions";
 
 type Props = {
   regions: Regions | null;
+  source: Source;
   period: Period;
   selectedId: number | null;
   onSelect: (region: RegionProps) => void;
 };
 
-function fillColor(period: Period): maplibregl.ExpressionSpecification {
-  return [
-    "interpolate", ["linear"], ["get", `p${period}`],
-    ...PSH_RAMP.flat(),
-  ] as maplibregl.ExpressionSpecification;
+type Expr = maplibregl.ExpressionSpecification;
+
+/** Same maths as regionValue() in lib/psh.ts, as a MapLibre expression. */
+function valueExpr(source: Source, period: Period): Expr {
+  const nasa: Expr = ["get", `p${period}`];
+  const gsa: Expr = period === 0
+    ? ["get", "g0"]
+    : ["*", ["get", "g0"], ["/", ["get", `v${period}`], ["get", "v0"]]];
+  return source === "nasa" ? nasa : source === "gsa" ? gsa : ["-", gsa, nasa];
+}
+
+function fillColor(source: Source, period: Period): Expr {
+  const color = [
+    "interpolate", ["linear"], valueExpr(source, period),
+    ...rampFor(source).flat(),
+  ] as Expr;
+  return source === "nasa" ? color : ["case", ["has", "g0"], color, NO_DATA_COLOR];
+}
+
+function formatValue(v: number | null, source: Source): string {
+  if (v === null) return "Tidak ada data GSA";
+  return `${source === "diff" ? formatSigned(v) : v.toFixed(2)} jam/hari`;
 }
 
 const whenState = (key: string): maplibregl.ExpressionSpecification =>
   ["case", ["boolean", ["feature-state", key], false], 1, 0];
 
-export default function PshMap({ regions, period, selectedId, onSelect }: Props) {
+export default function PshMap({ regions, source, period, selectedId, onSelect }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const onSelectRef = useRef(onSelect);
-  const periodRef = useRef(period);
+  const viewRef = useRef({ source, period });
   const selectedRef = useRef<number | null>(null);
+  const popupRef = useRef<maplibregl.Popup | null>(null);
   onSelectRef.current = onSelect;
-  periodRef.current = period;
+  viewRef.current = { source, period };
 
   // Create the map once.
   useEffect(() => {
@@ -46,6 +68,7 @@ export default function PshMap({ regions, period, selectedId, onSelect }: Props)
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 
     const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+    popupRef.current = popup;
     let hovered: number | string | undefined;
     const setHover = (id: number | string | undefined) => {
       if (hovered !== undefined) map.setFeatureState({ source: SOURCE, id: hovered }, { hover: false });
@@ -59,13 +82,13 @@ export default function PshMap({ regions, period, selectedId, onSelect }: Props)
       map.getCanvas().style.cursor = "pointer";
       setHover(f.id);
       const p = f.properties as RegionProps;
-      const v = Number(p[`p${periodRef.current}`]);
+      const { source, period } = viewRef.current;
       // Built from DOM nodes: region names come from data, not trusted HTML.
       const content = document.createElement("div");
       const name = document.createElement("div");
       name.textContent = regionName(p);
       const value = document.createElement("strong");
-      value.textContent = `${v.toFixed(2)} jam/hari`;
+      value.textContent = formatValue(regionValue(p, source, period), source);
       content.append(name, value);
       popup.setLngLat(e.lngLat).setDOMContent(content).addTo(map);
     });
@@ -95,6 +118,7 @@ export default function PshMap({ regions, period, selectedId, onSelect }: Props)
       if (source) {
         // Feature ids restart at 0 per level, so stale hover/selection must go.
         map.removeFeatureState({ source: SOURCE });
+        popupRef.current?.remove();
         selectedRef.current = null;
         source.setData(regions);
         return;
@@ -106,7 +130,10 @@ export default function PshMap({ regions, period, selectedId, onSelect }: Props)
         id: "regions-fill",
         type: "fill",
         source: SOURCE,
-        paint: { "fill-color": fillColor(periodRef.current), "fill-opacity": 0.85 },
+        paint: {
+          "fill-color": fillColor(viewRef.current.source, viewRef.current.period),
+          "fill-opacity": 0.85,
+        },
       }, firstLabel);
       map.addLayer({
         id: "regions-line",
@@ -135,11 +162,15 @@ export default function PshMap({ regions, period, selectedId, onSelect }: Props)
     else map.once("load", apply);
   }, [regions]);
 
-  // Recolour when the selected month changes.
+  // Recolour when the source or month changes.
   useEffect(() => {
     const map = mapRef.current;
-    if (map?.getLayer("regions-fill")) map.setPaintProperty("regions-fill", "fill-color", fillColor(period));
-  }, [period]);
+    if (map?.getLayer("regions-fill")) {
+      map.setPaintProperty("regions-fill", "fill-color", fillColor(source, period));
+    }
+    // Its text was computed for the previous source/month.
+    popupRef.current?.remove();
+  }, [source, period]);
 
   // Outline the selected region.
   useEffect(() => {
