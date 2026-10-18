@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
+import type { BillReading } from "../../shared/protocol";
+import { PLN_TARIFF_R1 } from "../../shared/tariff";
+import { readBillPhoto } from "../lib/ai";
 import { DAYS_IN_MONTH, type Climatology } from "../lib/psh";
 
 const fmt = (v: number, digits = 0) =>
@@ -9,7 +12,68 @@ type Props = {
   sourceLabel: string;
   /** GSA PVOUT (kWh/kWp/day), annual then Jan..Dec, when available. */
   pvout?: number[] | null;
+  /** Show the "read my PLN bill" upload (needs the AI backend). */
+  billReader?: boolean;
 };
+
+/** Monthly kWh from a reading: the kWh figure, else the bill amount at the R-1 tariff. */
+function kwhFromReading(r: BillReading): { kwh: number; estimated: boolean } | null {
+  if (r.pemakaian_kwh && r.pemakaian_kwh > 0) return { kwh: Math.round(r.pemakaian_kwh), estimated: false };
+  if (r.total_tagihan_rp && r.total_tagihan_rp > 0) {
+    return { kwh: Math.round(r.total_tagihan_rp / PLN_TARIFF_R1), estimated: true };
+  }
+  return null;
+}
+
+function BillUpload({ onKwh }: { onKwh: (kwh: number) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
+
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow picking the same file again
+    if (!file) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const reading = await readBillPhoto(file);
+      const usage = reading.terbaca ? kwhFromReading(reading) : null;
+      if (!usage) {
+        setStatus({ text: reading.catatan || "Pemakaian kWh tidak terbaca dari foto ini.", error: true });
+        return;
+      }
+      onKwh(usage.kwh);
+      const details = [
+        reading.periode,
+        reading.daya_va ? `${fmt(reading.daya_va)} VA` : null,
+        reading.golongan_tarif,
+      ].filter(Boolean);
+      setStatus({
+        text:
+          `Terbaca ${fmt(usage.kwh)} kWh${details.length ? ` (${details.join(", ")})` : ""}` +
+          (usage.estimated ? `, dihitung dari total tagihan dengan tarif Rp${fmt(PLN_TARIFF_R1, 1)}/kWh` : "") +
+          ".",
+        error: false,
+      });
+    } catch (err) {
+      setStatus({ text: (err as Error).message, error: true });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bill-upload">
+      <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => void onFile(e)} />
+      <button type="button" className="secondary" disabled={busy} onClick={() => inputRef.current?.click()}>
+        {busy ? "Membaca tagihan…" : "Isi dari foto tagihan PLN"}
+      </button>
+      {status && <p className={status.error ? "ai-error" : "hint"}>{status.text}</p>}
+      <p className="muted small">Foto hanya dikirim untuk dibaca AI dan tidak disimpan.</p>
+    </div>
+  );
+}
 
 /**
  * Rough PV yield: energy = PSH × kWp × performance ratio.
@@ -18,7 +82,7 @@ type Props = {
  * GSA's PVOUT already includes its own loss model, so it is shown as an
  * independent cross-check that ignores the PR field.
  */
-export default function Calculator({ data, sourceLabel, pvout }: Props) {
+export default function Calculator({ data, sourceLabel, pvout, billReader }: Props) {
   const [kwp, setKwp] = useState(3);
   const [pr, setPr] = useState(0.8);
   const [target, setTarget] = useState(300);
@@ -56,6 +120,7 @@ export default function Calculator({ data, sourceLabel, pvout }: Props) {
           <strong>{fmt(pvoutYearly)} kWh/tahun</strong>.
         </p>
       )}
+      {billReader && <BillUpload onKwh={setTarget} />}
       <label className="inverse">
         Kebutuhan listrik (kWh/bulan)
         <input type="number" min={0} step={10} value={target}

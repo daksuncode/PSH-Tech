@@ -4,22 +4,30 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit",
+    "dev:api": "vite build && wrangler dev",
+    "build": "npm run typecheck && vite build",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "test": "vitest run",
     "preview": "vite preview",
     "data:fetch": "node scripts/fetch-psh-grid.mjs",
-    "cf:preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
+    "data:gsa": "node scripts/fetch-gsa.mjs",
     "data:regions": "node scripts/build-regions.mjs",
-    "data:gsa": "node scripts/fetch-gsa.mjs"
+    "cf:preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
+    "hono": "^4.13.13",
     "maplibre-gl": "^5.24.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "topojson-client": "^3.1.0"
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "topojson-client": "^3.1.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261018.1",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^22.0.0",
     "@types/react": "^19.3.0",
@@ -32,6 +40,7 @@
     "mapshaper": "^0.7.88",
     "typescript": "^5.9.3",
     "vite": "^8.3.4",
+    "vitest": "^5.0.5",
     "wrangler": "^4.151.1"
   },
   "engines": {

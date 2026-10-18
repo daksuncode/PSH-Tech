@@ -1,0 +1,25 @@
+# Grafana for the PSH-Tech API metrics (Workers Analytics Engine).
+# Usage: cp .env.example .env, fill it in, then `docker compose up -d`
+# and open http://localhost:3000.
+services:
+  grafana:
+    image: grafana/grafana-oss:11.6.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      # Altinity ClickHouse plugin: the datasource Cloudflare documents for
+      # querying Analytics Engine from Grafana.
+      GF_INSTALL_PLUGINS: vertamedia-clickhouse-datasource
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:?set CF_ACCOUNT_ID in .env}
+      CF_API_TOKEN: ${CF_API_TOKEN:?set CF_API_TOKEN in .env}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  grafana-data:

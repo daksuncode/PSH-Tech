@@ -1,5 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from "react";
+import { useAiAvailable } from "../lib/ai";
 import Calculator from "./Calculator";
+import ExplainCard from "./ExplainCard";
 import MonthlyChart, { type Series } from "./MonthlyChart";
 import {
   LEVEL_LABEL, MONTHS, NO_DATA_COLOR, SOURCE_LABEL, formatSigned, gsaClimatology, gsaPvout,
@@ -10,6 +12,8 @@ import {
 
 // MapLibre is the heaviest dependency; load it in its own chunk.
 const PshMap = lazy(() => import("./PshMap"));
+// Chat (and its markdown renderer) loads only when the drawer is opened.
+const AiChat = lazy(() => import("./AiChat"));
 
 const LEVELS: Level[] = ["kabupaten", "kecamatan"];
 const SOURCES: Source[] = ["nasa", "gsa", "diff"];
@@ -22,6 +26,8 @@ export default function PshExplorer() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>(0);
   const [source, setSource] = useState<Source>("nasa");
+  const [chatOpen, setChatOpen] = useState(false);
+  const aiAvailable = useAiAvailable();
   const [selected, setSelected] = useState<RegionProps | null>(null);
 
   useEffect(() => {
@@ -87,12 +93,26 @@ export default function PshExplorer() {
       </div>
 
       <aside className="panel">
+        {chatOpen && (
+          <Suspense fallback={<div className="ai-chat" />}>
+            <AiChat
+              region={selected ? { level, id: selected.id } : null}
+              regionName={selected ? `${regionName(selected)}, ${regionParents(selected)}` : null}
+              onClose={() => setChatOpen(false)}
+            />
+          </Suspense>
+        )}
         <header>
           <h1>Peta Peak Sun Hours Indonesia</h1>
           <p className="muted">
             Rata-rata jangka panjang radiasi matahari harian (kWh/m²/hari = jam PSH)
             per wilayah, dari NASA POWER dan Global Solar Atlas.
           </p>
+          {aiAvailable && (
+            <button type="button" className="ai-open" onClick={() => setChatOpen(true)}>
+              Tanya asisten AI
+            </button>
+          )}
         </header>
 
         <div className="controls">
@@ -172,11 +192,13 @@ export default function PshExplorer() {
                 </div>
               </dl>
             )}
+            {aiAvailable && <ExplainCard region={{ level, id: selected.id }} source={source} period={period} />}
             <MonthlyChart series={series} period={period} note={gsa ? GSA_MONTHLY_NOTE : undefined} />
             <Calculator
               data={calcData}
               sourceLabel={source === "nasa" || !gsa ? SOURCE_LABEL.nasa : SOURCE_LABEL.gsa}
               pvout={gsaPvout(selected)}
+              billReader={aiAvailable}
             />
           </>
         )}
