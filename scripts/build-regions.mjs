@@ -5,21 +5,30 @@
 // Boundaries: BPS administrative boundaries via OCHA (HDX COD-AB), mirrored by
 // geoBoundaries "gbHumanitarian" — CC BY 3.0 IGO.
 //
-// Each region's value is the mean of the grid, bilinearly interpolated at a
-// lattice of sample points inside the polygon. The grid is 1° (~110 km), so
+// NASA POWER (p0..p12): the grid bilinearly interpolated at a lattice of sample
+// points inside the polygon, averaged. The grid is 1° (~110 km), so
 // neighbouring kecamatan often get similar values.
 //
-// Usage: npm run data:regions   (run npm run data:fetch first)
+// Global Solar Atlas (optional, from npm run data:gsa): mean of the raster
+// pixels whose centres fall inside the polygon.
+//   g0      GHI, kWh/m²/day (= PSH), 9 arcsec
+//   v0..v12 PVOUT, kWh/kWp/day, annual then Jan..Dec, 30 arcsec
+// GSA publishes monthly values only for PVOUT; the app estimates monthly GHI
+// from g0 and the PVOUT monthly profile.
+//
+// Usage: npm run data:regions   (run npm run data:fetch, optionally data:gsa, first)
 
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { fromFile } from "geotiff";
 import mapshaper from "mapshaper";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const CACHE = join(ROOT, ".cache/boundaries");
 const OUT_DIR = join(ROOT, "public/data");
+const GSA_DIR = join(ROOT, ".cache/gsa/raster");
 const GB_BASE =
   "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbHumanitarian/IDN";
 
@@ -143,6 +152,109 @@ async function loadLevel(level) {
   });
 }
 
+// ---------- rasters (Global Solar Atlas) ----------
+
+async function loadRaster(file) {
+  const image = await (await fromFile(file)).getImage();
+  const [x0, y0] = image.getOrigin();
+  const [res] = image.getResolution();
+  const [data] = await image.readRasters();
+  return { data, x0, y0, res, width: image.getWidth(), height: image.getHeight() };
+}
+
+/**
+ * Pixels whose centres fall inside the polygon, as flat [row, col0, col1, ...]
+ * triples. Scanline fill with the even-odd rule over every ring (holes too).
+ */
+function pixelSpans(geometry, bbox, g) {
+  const [, minY, , maxY] = bbox;
+  const r0 = Math.max(0, Math.floor((g.y0 - maxY) / g.res));
+  const r1 = Math.min(g.height - 1, Math.ceil((g.y0 - minY) / g.res));
+  if (r1 < r0) return [];
+  const rows = Array.from({ length: r1 - r0 + 1 }, () => []);
+  for (const poly of polygonsOf(geometry))
+    for (const ring of poly)
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xa, ya] = ring[j], [xb, yb] = ring[i];
+        if (ya === yb) continue;
+        const lo = Math.min(ya, yb), hi = Math.max(ya, yb);
+        const first = Math.max(r0, Math.floor((g.y0 - hi) / g.res - 0.5));
+        const last = Math.min(r1, Math.ceil((g.y0 - lo) / g.res - 0.5));
+        for (let r = first; r <= last; r++) {
+          const yc = g.y0 - (r + 0.5) * g.res;
+          // Half-open [lo, hi) so a vertex on a scanline is counted once.
+          if (yc >= lo && yc < hi) rows[r - r0].push(xa + ((yc - ya) * (xb - xa)) / (yb - ya));
+        }
+      }
+  const spans = [];
+  rows.forEach((xs, k) => {
+    xs.sort((a, b) => a - b);
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const c0 = Math.max(0, Math.ceil((xs[i] - g.x0) / g.res - 0.5));
+      const c1 = Math.min(g.width - 1, Math.floor((xs[i + 1] - g.x0) / g.res - 0.5));
+      if (c0 <= c1) spans.push(r0 + k, c0, c1);
+    }
+  });
+  return spans;
+}
+
+/** Mean of valid pixels in the spans; NaN pixels are no-data (sea). */
+function zonalMean(raster, spans, anchor) {
+  let sum = 0, n = 0;
+  for (let k = 0; k < spans.length; k += 3) {
+    const base = spans[k] * raster.width;
+    for (let c = spans[k + 1]; c <= spans[k + 2]; c++) {
+      const v = raster.data[base + c];
+      if (Number.isFinite(v)) {
+        sum += v;
+        n++;
+      }
+    }
+  }
+  if (n) return sum / n;
+  // Smaller than a pixel, or only no-data inside: nearest valid pixels around
+  // the anchor, searching outwards up to 3 pixels.
+  const col = Math.floor((anchor[0] - raster.x0) / raster.res);
+  const row = Math.floor((raster.y0 - anchor[1]) / raster.res);
+  for (let rad = 0; rad <= 3; rad++) {
+    for (let r = row - rad; r <= row + rad; r++)
+      for (let c = col - rad; c <= col + rad; c++) {
+        if (Math.max(Math.abs(r - row), Math.abs(c - col)) !== rad) continue;
+        if (r < 0 || c < 0 || r >= raster.height || c >= raster.width) continue;
+        const v = raster.data[r * raster.width + c];
+        if (Number.isFinite(v)) {
+          sum += v;
+          n++;
+        }
+      }
+    if (n) return sum / n;
+  }
+  return null;
+}
+
+/** Adds r.gsa = { ghi, pvout: [annual, jan..dec] } to every region. */
+async function addGsa(levels) {
+  const all = levels.flat();
+  const ghi = await loadRaster(join(GSA_DIR, "GHI.tif"));
+  for (const r of all) r.gsa = { ghi: zonalMean(ghi, pixelSpans(r.geometry, r.bbox, ghi), r.anchor) };
+  console.log("GSA: GHI done");
+
+  const pvFiles = ["PVOUT.tif", ...Array.from({ length: 12 }, (_, i) => `monthly/PVOUT_${String(i + 1).padStart(2, "0")}.tif`)];
+  let spans = null;
+  for (const [k, file] of pvFiles.entries()) {
+    const pv = await loadRaster(join(GSA_DIR, file));
+    // All PVOUT rasters share one grid, so the pixel masks are computed once.
+    spans ??= all.map((r) => pixelSpans(r.geometry, r.bbox, pv));
+    all.forEach((r, i) => {
+      r.gsa.pvout ??= [];
+      r.gsa.pvout[k] = zonalMean(pv, spans[i], r.anchor);
+    });
+  }
+  console.log("GSA: PVOUT annual + monthly done");
+  const missing = all.filter((r) => r.gsa.ghi === null).length;
+  if (missing) console.warn(`GSA: no data for ${missing} regions`);
+}
+
 function findParent(parents, [x, y]) {
   const candidates = parents.filter(
     (p) => x >= p.bbox[0] && x <= p.bbox[2] && y >= p.bbox[1] && y <= p.bbox[3],
@@ -161,6 +273,10 @@ function toFeatureCollection(regions, extraProps) {
     features: regions.map((r, id) => {
       const properties = { id, n: r.name, ...extraProps(r) };
       r.mean.forEach((v, k) => (properties[`p${k}`] = round2(v)));
+      if (r.gsa && r.gsa.ghi !== null && r.gsa.pvout.every((v) => v !== null)) {
+        properties.g0 = round2(r.gsa.ghi);
+        r.gsa.pvout.forEach((v, k) => (properties[`v${k}`] = round2(v)));
+      }
       return { type: "Feature", id, properties, geometry: r.geometry };
     }),
   };
@@ -179,6 +295,15 @@ for (const r of adm3) {
 }
 console.log(`ADM3: ${adm3.length} kecamatan`);
 
+const hasGsa = existsSync(join(GSA_DIR, "GHI.tif"));
+if (hasGsa) await addGsa([adm2, adm3]);
+else console.warn("GSA rasters not found (run npm run data:gsa); writing NASA values only");
+const months = Array.from({ length: 13 }, (_, k) => k);
+const valueFields = [
+  ...months.map((k) => `p${k}`),
+  ...(hasGsa ? ["g0", ...months.map((k) => `v${k}`)] : []),
+];
+
 await mkdir(OUT_DIR, { recursive: true });
 const outputs = [
   [LEVELS.ADM2.out, toFeatureCollection(adm2, (r) => ({ pr: r.province }))],
@@ -187,8 +312,9 @@ const outputs = [
 for (const [name, fc] of outputs) {
   // TopoJSON stores each shared border once and quantizes coordinates, which
   // makes the kecamatan layer several times smaller than plain GeoJSON.
+  const fields = ["id", "n", ...(name === LEVELS.ADM3.out ? ["kb"] : []), "pr", ...valueFields];
   const out = await mapshaper.applyCommands(
-    `-i in.json snap -filter-fields ${Object.keys(fc.features[0].properties).join(",")} ` +
+    `-i in.json snap -filter-fields ${fields.join(",")} ` +
       "-rename-layers regions -o out.json format=topojson quantization=200000 id-field=id",
     { "in.json": JSON.stringify(fc) },
   );

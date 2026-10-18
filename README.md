@@ -2,9 +2,14 @@
 
 Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya.
 
-- **Data:** [NASA POWER](https://power.larc.nasa.gov), parameter `ALLSKY_SFC_SW_DWN`
-  (radiasi matahari harian di permukaan, kWh/m²/hari). Karena PSH = kWh/m²/hari ÷ 1 kW/m²,
-  angkanya langsung sama dengan jam PSH. Dipakai rata-rata jangka panjang (climatology).
+- **Data radiasi** (dua sumber, bisa dibandingkan di aplikasi). PSH = kWh/m²/hari ÷ 1 kW/m²,
+  jadi angka radiasi harian langsung sama dengan jam PSH.
+  - [NASA POWER](https://power.larc.nasa.gov), `ALLSKY_SFC_SW_DWN`, rata-rata jangka panjang,
+    grid 1° (±110 km).
+  - [Global Solar Atlas 2.0](https://globalsolaratlas.info) (World Bank/ESMAP, data © 2019 Solargis,
+    CC BY 4.0): GHI rata-rata harian ±280 m dan PVOUT (kWh/kWp/hari) ±1 km. GSA hanya
+    menerbitkan nilai bulanan untuk PVOUT, jadi PSH bulanan GSA **diestimasi** sebagai
+    GHI tahunan × (PVOUT bulan itu ÷ PVOUT tahunan).
 - **Batas wilayah:** batas administrasi BPS (34 provinsi, 522 kabupaten/kota, 7.069 kecamatan)
   dari [OCHA HDX COD-AB](https://data.humdata.org/dataset/cod-ab-idn), diambil lewat salinan
   [geoBoundaries](https://www.geoboundaries.org) "gbHumanitarian". Lisensi CC BY 3.0 IGO.
@@ -19,8 +24,10 @@ Peta **Peak Sun Hours (PSH)** Indonesia untuk perencanaan PLTS atap / PLTS surya
 ## Fitur
 
 - Peta PSH per **kabupaten/kota** atau per **kecamatan** (hanya daratan), bisa pilih rata-rata tahunan atau per bulan
-- Klik wilayah → nama, induk wilayah, PSH, dan grafik 12 bulan
-- Kalkulator PLTS: produksi = PSH × kWp × performance ratio, plus estimasi kWp untuk kebutuhan kWh/bulan
+- Dropdown **Sumber data**: NASA POWER, Global Solar Atlas, atau **Selisih (GSA − NASA)** dengan skala warna divergen
+- Klik wilayah → nama, induk wilayah, nilai NASA/GSA/selisih, dan grafik 12 bulan kedua sumber berdampingan
+- Kalkulator PLTS: produksi = PSH × kWp × performance ratio, plus estimasi kWp untuk kebutuhan kWh/bulan,
+  dan pembanding produksi tahunan dari PVOUT GSA
 
 ## Menjalankan secara lokal
 
@@ -35,19 +42,24 @@ Data wilayah sudah ada di repo (`public/data/*.topo.json`), jadi langsung bisa d
 
 ```bash
 npm run data:fetch     # grid NASA POWER -> data/psh-grid.json
+npm run data:gsa       # unduh paket GIS Global Solar Atlas Indonesia (±330 MB) -> .cache/gsa/raster
 npm run data:regions   # batas wilayah + rata-rata PSH -> public/data/kabupaten.topo.json, kecamatan.topo.json
 ```
 
 - `data:fetch` mengambil data per kotak 10°×10° (batas API regional NASA POWER).
+- `data:gsa` mengunduh GeoTIFF GSA (GHI, PVOUT tahunan + bulanan). File ini tidak di-commit.
+  Kalau dilewati, `data:regions` tetap jalan tapi hanya menulis nilai NASA.
 - `data:regions` mengunduh batas wilayah (disimpan di `.cache/`), menyederhanakan bentuknya,
   lalu menghitung PSH tiap wilayah sebagai rata-rata grid yang diinterpolasi bilinear di titik-titik
   sampel di dalam poligon. Induk wilayah (kecamatan → kabupaten → provinsi) dicocokkan secara spasial.
-  Hasilnya TopoJSON (kecamatan ±4,7 MB, ±1,4 MB terkompresi).
+  Nilai GSA dihitung sebagai rata-rata piksel yang titik tengahnya ada di dalam poligon.
+  Hasilnya TopoJSON (kecamatan ±5,7 MB, ±1,65 MB terkompresi).
 
 Commit hasilnya supaya build di Cloudflare tidak perlu mengunduh apa pun.
 
-> **Batas resolusi:** grid NASA POWER berukuran 1° (±110 km). Nilai kecamatan yang berdekatan
-> karena itu sering mirip; perbedaan detail antar-kecamatan butuh sumber data beresolusi lebih tinggi.
+> **Batas resolusi:** grid NASA POWER berukuran 1° (±110 km), jadi nilai kecamatan yang berdekatan
+> sering mirip. Untuk perbedaan antar-kecamatan, pakai mode Global Solar Atlas (±280 m).
+> Beberapa pulau sangat kecil (mis. Kepulauan Seribu) tidak tercakup raster GSA.
 
 ## Deploy ke Cloudflare
 
@@ -77,13 +89,14 @@ npm run deploy       # vite build && wrangler deploy
 ```
 index.html                    entry HTML Vite
 src/main.tsx                  bootstrap React
-src/components/PshExplorer    state utama: periode, titik terpilih, panel
-src/components/PshMap         peta MapLibre + layer grid
+src/components/PshExplorer    state utama: level, sumber data, periode, panel
+src/components/PshMap         peta MapLibre + layer wilayah
 src/components/MonthlyChart   grafik PSH bulanan
 src/components/Calculator     kalkulator PLTS
 src/lib/psh.ts                tipe data wilayah, skala warna, pemuat TopoJSON
 scripts/fetch-psh-grid.mjs    pengunduh grid NASA POWER
-scripts/build-regions.mjs     batas wilayah + agregasi PSH per kabupaten/kecamatan
+scripts/fetch-gsa.mjs         pengunduh raster Global Solar Atlas
+scripts/build-regions.mjs     batas wilayah + agregasi PSH (NASA & GSA) per kabupaten/kecamatan
 data/psh-grid.json            grid NASA POWER (input build)
 public/data/*.topo.json       data wilayah yang dimuat aplikasi
 wrangler.jsonc                konfigurasi Cloudflare
@@ -91,7 +104,5 @@ wrangler.jsonc                konfigurasi Cloudflare
 
 ## Rencana berikutnya
 
-- Data radiasi beresolusi lebih tinggi supaya beda antar-kecamatan lebih nyata
-  (mis. [Global Solar Atlas](https://globalsolaratlas.info), CC BY 4.0, ±250 m)
 - Pencarian nama kecamatan/kabupaten
 - Validasi dengan data lama penyinaran stasiun BMKG

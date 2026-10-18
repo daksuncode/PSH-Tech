@@ -32,24 +32,70 @@ export const LEVEL_LABEL: Record<Level, string> = {
   kecamatan: "Kecamatan",
 };
 
+/** Data shown on the map; "diff" is Global Solar Atlas minus NASA POWER. */
+export type Source = "nasa" | "gsa" | "diff";
+
+export const SOURCE_LABEL: Record<Source, string> = {
+  nasa: "NASA POWER",
+  gsa: "Global Solar Atlas",
+  diff: "Selisih (GSA − NASA)",
+};
+
 /**
  * Region properties written by scripts/build-regions.mjs: name, parent names,
- * and PSH as p0 (annual) .. p12 (Dec).
+ * NASA POWER PSH as p0 (annual) .. p12 (Dec), and — where Global Solar Atlas
+ * has data — GSA GHI g0 (annual PSH) and PVOUT v0 (annual) .. v12 (Dec).
  */
 export type RegionProps = {
   id: number;
   n: string;
   kb?: string;
   pr: string;
-} & Record<`p${number}`, number>;
+  g0?: number;
+} & Record<`p${number}`, number> & Partial<Record<`v${number}`, number>>;
 
 export type Regions = FeatureCollection<Polygon | MultiPolygon, RegionProps>;
 
-export function regionClimatology(r: RegionProps): Climatology {
+export function nasaClimatology(r: RegionProps): Climatology {
   return {
     annual: r.p0,
     monthly: Array.from({ length: 12 }, (_, i) => r[`p${i + 1}`]),
   };
+}
+
+/**
+ * GSA publishes monthly values only for PVOUT, so monthly GHI is estimated as
+ * annual GHI × (PVOUT that month / PVOUT annual). Null where GSA has no data.
+ */
+export function gsaClimatology(r: RegionProps): Climatology | null {
+  const g0 = r.g0, v0 = r.v0;
+  if (g0 === undefined || !v0) return null;
+  return {
+    annual: g0,
+    monthly: Array.from({ length: 12 }, (_, i) => (g0 * (r[`v${i + 1}`] ?? NaN)) / v0),
+  };
+}
+
+/** GSA PVOUT (kWh/kWp/day): annual then Jan..Dec, or null. */
+export function gsaPvout(r: RegionProps): number[] | null {
+  const v = Array.from({ length: 13 }, (_, k) => r[`v${k}`]);
+  return v.every((x): x is number => x !== undefined) ? v : null;
+}
+
+/** The value the map shows for a region, or null when GSA has no data. */
+export function regionValue(r: RegionProps, source: Source, period: Period): number | null {
+  const nasa = periodValue(nasaClimatology(r), period);
+  if (source === "nasa") return nasa;
+  const gsa = gsaClimatology(r);
+  if (!gsa) return null;
+  const g = periodValue(gsa, period);
+  return source === "gsa" ? g : g - nasa;
+}
+
+/** "+0.12" / "−0.30": signed, with a true minus sign. */
+export function formatSigned(v: number, digits = 2): string {
+  const s = Math.abs(v).toFixed(digits);
+  return v > 0 ? `+${s}` : v < 0 ? `−${s}` : s;
 }
 
 // Source names mark cities with a "Kota " prefix; everything else is a kabupaten.
@@ -85,6 +131,23 @@ export const PSH_RAMP: [number, string][] = [
   [6.0, "#b84b1a"],
   [6.5, "#843311"],
 ];
+
+// Diverging ramp for GSA − NASA: blue where GSA is lower, red where it is
+// higher, neutral grey at zero.
+export const DIFF_RAMP: [number, string][] = [
+  [-0.75, "#184f95"],
+  [-0.5, "#3987e5"],
+  [-0.25, "#9ec5f4"],
+  [0, "#f0efec"],
+  [0.25, "#f6b3b0"],
+  [0.5, "#e34948"],
+  [0.75, "#a32525"],
+];
+
+/** Fill for regions without Global Solar Atlas data (tiny islands). */
+export const NO_DATA_COLOR = "#c9c7c1";
+
+export const rampFor = (source: Source) => (source === "diff" ? DIFF_RAMP : PSH_RAMP);
 
 export function periodLabel(period: Period): string {
   return period === 0 ? "Rata-rata tahunan" : MONTHS[period - 1];

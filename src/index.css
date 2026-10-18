@@ -6,9 +6,10 @@
   --text-muted: #6b6963;
   --accent: #b84b1a;
   --bar: #e2662d;
-  --bar-muted: #f7d4bd;
   --grid: #ebe9e4;
   --notice-bg: #fdf1e7;
+  --series-nasa: #2a78d6;
+  --series-gsa: #eb6834;
   color-scheme: light;
 }
 
@@ -21,9 +22,10 @@
     --text-muted: #a5a39c;
     --accent: #f08a53;
     --bar: #f08a53;
-    --bar-muted: #5a3420;
     --grid: #2c2b28;
     --notice-bg: #33231a;
+    --series-nasa: #3987e5;
+    --series-gsa: #d95926;
     color-scheme: dark;
   }
 }
@@ -36,9 +38,10 @@
   --text-muted: #a5a39c;
   --accent: #f08a53;
   --bar: #f08a53;
-  --bar-muted: #5a3420;
   --grid: #2c2b28;
   --notice-bg: #33231a;
+  --series-nasa: #3987e5;
+  --series-gsa: #d95926;
   color-scheme: dark;
 }
 
@@ -96,6 +99,7 @@ code { font-size: 0.85em; }
 .legend-ramp { display: flex; height: 10px; border-radius: 3px; overflow: hidden; }
 .legend-ramp span { flex: 1; }
 .legend-ticks { display: flex; justify-content: space-between; color: var(--text-muted); }
+.legend-nodata { margin-top: 4px; color: var(--text-muted); }
 
 .panel {
   background: var(--surface);
@@ -168,7 +172,20 @@ select, input {
 .chart .axis { fill: var(--text-muted); font-size: 9px; }
 .chart .label { fill: var(--text); font-size: 9px; }
 .chart .bar { fill: var(--bar); }
-.chart .bar.muted { fill: var(--bar-muted); }
+.chart .bar.series-nasa { fill: var(--series-nasa); }
+.chart .bar.series-gsa { fill: var(--series-gsa); }
+.chart g.muted .bar { opacity: 0.3; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.75rem; margin-bottom: 4px; }
+.chart-legend .swatch, .legend-nodata i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.swatch.series-nasa { background: var(--series-nasa); }
+.swatch.series-gsa { background: var(--series-gsa); }
 .chart figcaption { font-size: 0.75rem; color: var(--text-muted); }
 .chart details { font-size: 0.8rem; margin-top: 4px; }
 .chart table { border-collapse: collapse; margin-top: 4px; }
@@ -192,6 +209,8 @@ select, input {
 .stats div { background: var(--bg); border-radius: 6px; padding: 6px 8px; }
 .stats dt { font-size: 0.75rem; color: var(--text-muted); }
 .stats dd { margin: 0; font-weight: 600; }
+.stats dd small { font-weight: 400; color: var(--text-muted); }
+.stats.compare { margin: 0; }
 .inverse { margin-top: 4px; }
 .hint { margin: 6px 0 0; font-size: 0.85rem; }
 
