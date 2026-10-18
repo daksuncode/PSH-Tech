@@ -7,6 +7,7 @@
 import type { FeatureCollection, MultiPolygon, Polygon } from "geojson";
 import type { Topology } from "topojson-specification";
 import { feature } from "topojson-client";
+import { gsaMonthlyEstimate } from "../../shared/gsa";
 
 export const MONTHS = [
   "Jan", "Feb", "Mar", "Apr", "Mei", "Jun",
@@ -68,12 +69,9 @@ export function nasaClimatology(r: RegionProps): Climatology {
  * annual GHI × (PVOUT that month / PVOUT annual). Null where GSA has no data.
  */
 export function gsaClimatology(r: RegionProps): Climatology | null {
-  const g0 = r.g0, v0 = r.v0;
-  if (g0 === undefined || !v0) return null;
-  return {
-    annual: g0,
-    monthly: Array.from({ length: 12 }, (_, i) => (g0 * (r[`v${i + 1}`] ?? NaN)) / v0),
-  };
+  const pvout = gsaPvout(r);
+  if (r.g0 === undefined || !pvout?.[0]) return null;
+  return { annual: r.g0, monthly: gsaMonthlyEstimate(r.g0, pvout) };
 }
 
 /** GSA PVOUT (kWh/kWp/day): annual then Jan..Dec, or null. */

@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# Workers Analytics Engine SQL API, set up the way Cloudflare documents for
+# Grafana: Altinity ClickHouse plugin, auth off, Authorization header.
+datasources:
+  - name: Cloudflare Analytics Engine
+    uid: cf-analytics-engine
+    type: vertamedia-clickhouse-datasource
+    access: proxy
+    url: https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql
+    isDefault: true
+    jsonData:
+      httpHeaderName1: Authorization
+    secureJsonData:
+      httpHeaderValue1: Bearer ${CF_API_TOKEN}

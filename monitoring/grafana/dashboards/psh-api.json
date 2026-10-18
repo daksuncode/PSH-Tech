@@ -1,0 +1,1087 @@
+{
+  "uid": "psh-tech-api",
+  "title": "PSH-Tech API",
+  "tags": [
+    "psh-tech",
+    "cloudflare",
+    "claude"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "description": "Metrik per request dari Worker PSH-Tech (Workers Analytics Engine, dataset psh_api_metrics). Skema kolom: worker/src/metrics.ts.",
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Ringkasan",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Request API",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Request AI",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter AND blob1 IN ('chat', 'explain', 'bill')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "chat + explain + bill"
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Error rate AI",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT 100 * sumIf(_sample_interval, blob2 != 'ok') / SUM(_sample_interval) AS error_pct FROM psh_api_metrics WHERE $timeFilter AND blob1 IN ('chat', 'explain', 'bill')"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "Semua outcome selain ok, termasuk rate_limited dan client_error."
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Latency p95 chat",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT quantileExactWeighted(0.95)(double2, _sample_interval) AS p95 FROM psh_api_metrics WHERE $timeFilter AND blob1 = 'chat' AND blob2 = 'ok'"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "Sampai stream selesai."
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Token (input + output)",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT SUM(_sample_interval * (double4 + double5 + double6 + double7)) AS tokens FROM psh_api_metrics WHERE $timeFilter"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "Input tanpa cache + output + baca cache + tulis cache."
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Estimasi biaya Claude",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT SUM(_sample_interval * double8) AS cost FROM psh_api_metrics WHERE $timeFilter"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "description": "Dari harga daftar per model; tagihan resmi ada di Anthropic Console."
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Lalu lintas & error",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Request per route",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob1 AS route, SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter GROUP BY t, route ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Jumlah request per interval waktu."
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Outcome",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob2 AS outcome, SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter GROUP BY t, outcome ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "ok, client_error, rate_limited, config_error, upstream_error, refusal, error"
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Latensi",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Latency p95 per route",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob1 AS route, quantileExactWeighted(0.95)(double2, _sample_interval) AS p95 FROM psh_api_metrics WHERE $timeFilter AND blob2 = 'ok' GROUP BY t, route ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Latency p50 per route",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob1 AS route, quantileExactWeighted(0.5)(double2, _sample_interval) AS p50 FROM psh_api_metrics WHERE $timeFilter AND blob2 = 'ok' GROUP BY t, route ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Waktu ke teks pertama (p95)",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 15,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob1 AS route, quantileExactWeighted(0.95)(double3, _sample_interval) AS ttft_p95 FROM psh_api_metrics WHERE $timeFilter AND double3 > 0 GROUP BY t, route ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "description": "Seberapa cepat jawaban mulai muncul di layar (chat dan explain)."
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Token & biaya",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Token per interval",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double4) AS input FROM psh_api_metrics WHERE $timeFilter GROUP BY t ORDER BY t"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double5) AS output FROM psh_api_metrics WHERE $timeFilter GROUP BY t ORDER BY t"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double6) AS cache_read FROM psh_api_metrics WHERE $timeFilter GROUP BY t ORDER BY t"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double7) AS cache_write FROM psh_api_metrics WHERE $timeFilter GROUP BY t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Estimasi biaya per route",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, blob1 AS route, SUM(_sample_interval * double8) AS cost FROM psh_api_metrics WHERE $timeFilter AND blob1 IN ('chat', 'explain', 'bill') GROUP BY t, route ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 40,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Asisten AI",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Pemanggilan tool",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double11) AS cari_wilayah FROM psh_api_metrics WHERE $timeFilter AND blob1 = 'chat' GROUP BY t ORDER BY t"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "time_series",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT $timeSeries AS t, SUM(_sample_interval * double12) AS hitung_plts FROM psh_api_metrics WHERE $timeFilter AND blob1 = 'chat' GROUP BY t ORDER BY t"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Error per jenis",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 33,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT blob1 AS route, blob2 AS outcome, blob5 AS error_type, SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter AND blob2 != 'ok' GROUP BY route, outcome, error_type ORDER BY requests DESC LIMIT 20"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Model & fallback",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 33,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT blob3 AS model, SUM(_sample_interval) AS requests, SUM(_sample_interval * double13) AS fallback, SUM(_sample_interval * double10) / SUM(_sample_interval) AS llm_calls_avg FROM psh_api_metrics WHERE $timeFilter AND blob3 != '' GROUP BY model ORDER BY requests DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "description": "fallback = jumlah request yang dijawab model pengganti karena model utama menolak."
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Negara asal request",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT blob7 AS country, SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter GROUP BY country ORDER BY requests DESC LIMIT 15"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Stop reason Claude",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 41,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT blob1 AS route, blob4 AS stop_reason, SUM(_sample_interval) AS requests FROM psh_api_metrics WHERE $timeFilter AND blob4 != '' GROUP BY route, stop_reason ORDER BY requests DESC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "description": "end_turn normal; max_tokens = jawaban terpotong; refusal = ditolak; max_llm_calls = batas langkah tool tercapai."
+    },
+    {
+      "id": 24,
+      "type": "table",
+      "title": "Data center Cloudflare",
+      "datasource": {
+        "type": "vertamedia-clickhouse-datasource",
+        "uid": "cf-analytics-engine"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 41,
+        "w": 8,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "vertamedia-clickhouse-datasource",
+            "uid": "cf-analytics-engine"
+          },
+          "format": "table",
+          "dateTimeType": "DATETIME",
+          "dateTimeColDataType": "timestamp",
+          "round": "0s",
+          "intervalFactor": 1,
+          "skip_comments": true,
+          "query": "SELECT blob8 AS colo, SUM(_sample_interval) AS requests, quantileExactWeighted(0.95)(double2, _sample_interval) AS p95_ms FROM psh_api_metrics WHERE $timeFilter GROUP BY colo ORDER BY requests DESC LIMIT 15"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

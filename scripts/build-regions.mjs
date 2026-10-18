@@ -291,6 +291,7 @@ const adm3 = await loadLevel("ADM3");
 for (const r of adm3) {
   const parent = findParent(adm2, r.anchor);
   r.regency = parent.name;
+  r.regencyId = adm2.indexOf(parent);
   r.province = parent.province;
 }
 console.log(`ADM3: ${adm3.length} kecamatan`);
@@ -309,6 +310,32 @@ const outputs = [
   [LEVELS.ADM2.out, toFeatureCollection(adm2, (r) => ({ pr: r.province }))],
   [LEVELS.ADM3.out, toFeatureCollection(adm3, (r) => ({ kb: r.regency, pr: r.province }))],
 ];
+// Geometry-free index for the AI backend (worker/). Kecamatan values are
+// sharded per kabupaten so a Worker only parses the slice it needs.
+const indexValues = (r) => ({
+  p: r.mean.map(round2),
+  ...(r.gsa && r.gsa.ghi !== null && r.gsa.pvout.every((v) => v !== null)
+    ? { g: round2(r.gsa.ghi), v: r.gsa.pvout.map(round2) }
+    : {}),
+});
+const INDEX_DIR = join(OUT_DIR, "index");
+await mkdir(join(INDEX_DIR, "kec"), { recursive: true });
+await writeFile(
+  join(INDEX_DIR, "kabupaten.json"),
+  JSON.stringify(adm2.map((r, id) => ({ id, n: r.name, pr: r.province, ...indexValues(r) }))),
+);
+// Array position = kecamatan id; each entry is [name, kabupaten id].
+await writeFile(join(INDEX_DIR, "kecamatan.json"), JSON.stringify(adm3.map((r) => [r.name, r.regencyId])));
+const shards = new Map();
+adm3.forEach((r, id) => {
+  if (!shards.has(r.regencyId)) shards.set(r.regencyId, []);
+  shards.get(r.regencyId).push({ id, n: r.name, ...indexValues(r) });
+});
+for (const [kabId, rows] of shards) {
+  await writeFile(join(INDEX_DIR, "kec", `${kabId}.json`), JSON.stringify(rows));
+}
+console.log(`Wrote public/data/index (${shards.size} kecamatan shards)`);
+
 for (const [name, fc] of outputs) {
   // TopoJSON stores each shared border once and quantizes coordinates, which
   // makes the kecamatan layer several times smaller than plain GeoJSON.
